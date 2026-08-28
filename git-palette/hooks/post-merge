@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# post-merge hook: after a merge, regenerate the editor-facing .sb3 from the
+# committed palette tree (reverse of the pre-commit unpack). Already-resolved
+# conflicts show up as a clean tree, so the sync runs normally.
+set -e
+node "$(dirname "$0")/../src/index.js" editor-sync

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# post-checkout hook: after a checkout/branch switch, regenerate the
+# editor-facing .sb3 from the committed palette tree (reverse of the
+# pre-commit unpack). Skips automatically when there are unresolved
+# merge conflicts.
+set -e
+node "$(dirname "$0")/../src/index.js" editor-sync

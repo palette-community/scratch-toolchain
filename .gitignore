@@ -1,0 +1,12 @@
+# Reference clone: scratch4js is only for studying git-sb3 logic; it does not enter the repo.
+/scratch4js/
+
+# Reference material (external docs整理); not versioned.
+/docs/reference/
+
+# git-palette
+node_modules/
+*.sb3
+
+# OS files
+.DS_Store

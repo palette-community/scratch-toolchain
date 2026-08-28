@@ -1,0 +1,19 @@
+#!/usr/bin/env node
+/**
+ * pre-commit hook entry. git runs this file via `core.hooksPath`; it unpacks
+ * every staged `.sb3` into the palette tree and re-stages the tree.
+ */
+import { runPreCommit } from '../src/hook.js';
+
+try {
+  const reports = await runPreCommit();
+  for (const r of reports) {
+    process.stderr.write(
+      `git-palette: unpacked ${r.sb3} → ${r.targets} target(s), ` +
+        `${r.assetFiles} asset(s), ${r.textFiles} tree file(s)\n`,
+    );
+  }
+} catch (err) {
+  process.stderr.write(`git-palette: ${err.message}\n`);
+  process.exit(1);
+}
