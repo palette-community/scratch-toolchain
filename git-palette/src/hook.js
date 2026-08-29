@@ -14,6 +14,7 @@ import { loadSb3, writeSb3 } from './sb3.js';
 import { buildTree, readTree, PALETTE_DIR, ROLES_DIR } from './tree.js';
 import { sbTextForProject } from './text.js';
 import { extractDeps, renderDeps, parseDeps, applyDepsToJson, readDepsFile } from './deps.js';
+import { resolveExtensions } from './extresolve.js';
 import {
   repoRoot,
   stagedFiles,
@@ -52,7 +53,10 @@ export async function runPreCommit({ cwd } = {}) {
   for (const rel of sb3s) {
     const bytes = await stagedBlob(rel, { cwd });
     const { json, assets } = await loadSb3(bytes);
-    const depsText = renderDeps(extractDeps(json));
+    const paletteDir = path.join(root, PALETTE_DIR);
+    const { resolvedById, warnings } = await resolveExtensions(json, { paletteDir });
+    for (const w of warnings) process.stderr.write(`git-palette: warning: ${w}\n`);
+    const depsText = renderDeps(extractDeps(json, resolvedById));
     const sbSnippets = await sbTextForProject(json, { language: 'en' });
     const files = buildTree(json, assets, {
       name: path.basename(rel).replace(/\.sb3$/i, ''),
@@ -97,9 +101,11 @@ export async function writeTree(root, files) {
   const cacheDir = path.join(paletteDir, CACHE_DIR);
 
   // Move the extension cache out of the way (it must survive rebuilds).
+  // Paths are kept relative to `root` so they restore into `.palette/cache`,
+  // not a stray top-level `cache/` directory.
   let cacheFiles = [];
   try {
-    cacheFiles = await readDirRecursive(cacheDir);
+    cacheFiles = await readDirRecursive(cacheDir, root);
     await fs.rm(cacheDir, { recursive: true, force: true });
   } catch {
     // No cache yet.
@@ -127,7 +133,7 @@ export async function writeTree(root, files) {
 }
 
 /** @param {string} dir @returns {Promise<{path: string, content: Uint8Array}[]>} */
-async function readDirRecursive(dir) {
+async function readDirRecursive(dir, base = dir) {
   const out = [];
   let entries = [];
   try {
@@ -137,11 +143,11 @@ async function readDirRecursive(dir) {
   }
   for (const e of entries) {
     const full = path.join(dir, e.name);
-    const rel = path.relative(dir, full);
+    const rel = path.relative(base, full);
     if (e.isDirectory()) {
-      out.push(...(await readDirRecursive(full)));
+      out.push(...(await readDirRecursive(full, base)));
     } else {
-      out.push({ path: path.join('cache', rel), content: await fs.readFile(full) });
+      out.push({ path: rel, content: await fs.readFile(full) });
     }
   }
   return out;

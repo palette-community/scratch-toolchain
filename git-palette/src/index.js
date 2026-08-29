@@ -26,6 +26,7 @@ import {
   readDepsFile,
 } from './deps.js';
 import { parseExtension, serializeSnapshot } from 'scratch-sandbox';
+import { resolveExtensions, registerCachedExtensions } from './extresolve.js';
 import {
   repoRoot,
   setConfig,
@@ -126,11 +127,14 @@ program
   .action(async (file, opts) => {
     const root = opts.root || (await repoRoot());
     const { json, assets } = await readSb3(file);
+    const paletteDir = path.join(root, '.palette');
+    const { resolvedById, warnings } = await resolveExtensions(json, { paletteDir });
+    for (const w of warnings) process.stderr.write(`git-palette: warning: ${w}\n`);
     const sbSnippets = await sbTextForProject(json, { language: 'en' });
     const files = buildTree(json, assets, {
       name: stripSb3Ext(path.basename(file)),
       source: file,
-      depsText: renderDeps(extractDeps(json)),
+      depsText: renderDeps(extractDeps(json, resolvedById)),
       sbSnippets,
     });
     await writeTree(root, files);
@@ -221,7 +225,11 @@ program
         results.push(`${e.id}: no cached js (run 'git palette deps lock' first)`);
         continue;
       }
-      const result = await parseExtension(source, { url: e.spec, cacheDir });
+      const result = await parseExtension(source, {
+        url: e.spec,
+        cacheDir,
+        unsandboxed: true,
+      });
       if (!result.ok) {
         results.push(
           `${e.id}: parse failed — ${result.errors.map((x) => x.message).join('; ')}`,
@@ -261,6 +269,7 @@ async function ignoredSb3s(root) {
  */
 async function statusOne(root, sb3) {
   const { json, assets } = await readSb3(sb3);
+  await registerCachedExtensions(path.join(root, '.palette'));
   const snippets = await sbTextForProject(json, { language: 'en' });
   const files = buildTree(json, assets, {
     name: stripSb3Ext(path.basename(sb3)),
@@ -319,6 +328,8 @@ async function statusOne(root, sb3) {
  */
 async function renderSb3ToTemp(sb3) {
   const { json } = await readSb3(sb3);
+  const root = await repoRoot();
+  await registerCachedExtensions(path.join(root, '.palette'));
   const snippets = await sbTextForProject(json, { language: 'en' });
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'palette-diff-'));
   for (const [name, snip] of Object.entries(snippets)) {

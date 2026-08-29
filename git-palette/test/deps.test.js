@@ -41,9 +41,9 @@ test('extractDeps: strings are builtin, URL strings and objects carry js', () =>
   };
   const entries = extractDeps(json);
   assert.deepEqual(entries, [
-    { id: 'pen', spec: 'builtin', form: 'builtin' },
-    { id: 'example', spec: 'https://extensions.turbowarp.org/example.js', form: 'string' },
-    { id: 'myext', spec: 'https://ext.turbowarp.org/foo.js', form: 'object' },
+    { id: 'pen', spec: 'builtin', form: 'builtin', kind: 'builtin' },
+    { id: 'example', spec: 'https://extensions.turbowarp.org/example.js', form: 'string', kind: 'url' },
+    { id: 'myext', spec: 'https://ext.turbowarp.org/foo.js', form: 'object', kind: 'url' },
   ]);
 });
 

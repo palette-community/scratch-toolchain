@@ -8,5 +8,8 @@
 node_modules/
 *.sb3
 
+# Working scratchpad (plan notes); must never enter history.
+PLAN.md
+
 # OS files
 .DS_Store

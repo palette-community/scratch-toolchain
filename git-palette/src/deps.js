@@ -87,30 +87,74 @@ export function renderDeps(entries, comments = []) {
  * Extract extension entries from a project.json.
  *
  * Per the sb3 format reference (docs/reference/sb3-file-format.md §3.7):
- * built-in extensions appear as bare ID strings; TurboWarp custom extensions
- * may appear either as a plain URL string or as an
- * `{extensionId, js, type: 'extension'}` object. The source form is kept so
- * re-packing stays lossless.
+ * `project.extensions` lists bare IDs for BOTH built-in and custom extensions,
+ * so it alone cannot tell them apart. `resolvedById` (from
+ * {@link module:extresolve}) carries the custom extensions actually discovered
+ * in the project — either loaded from a URL or embedded as JS source — and
+ * overrides the bare-ID classification so they are recorded as `url`/`source`
+ * instead of `builtin`.
  *
  * @param {object} json
+ * @param {Map<string, { id: string, kind: 'url'|'source', url?: string }>} [resolvedById]
+ *   Discovered custom extensions (id → kind/url). Optional.
  * @returns {DepEntry[]}
  */
-export function extractDeps(json) {
+export function extractDeps(json, resolvedById = null) {
+  const resolved = resolvedById || new Map();
   const entries = [];
   for (const ext of (json && json.extensions) || []) {
+    let id;
+    let declaredUrl = null;
+    let form = 'builtin';
     if (typeof ext === 'string') {
       if (/^https?:\/\//i.test(ext)) {
-        // TurboWarp style: extension loaded straight from a URL string.
-        entries.push({ id: urlBasename(ext), spec: ext, form: 'string' });
+        id = urlBasename(ext);
+        declaredUrl = ext;
+        form = 'string';
       } else {
-        entries.push({ id: ext, spec: 'builtin', form: 'builtin' });
+        id = ext;
+        form = 'builtin';
       }
     } else if (ext && typeof ext === 'object' && ext.extensionId) {
+      id = ext.extensionId;
+      declaredUrl = typeof ext.js === 'string' ? ext.js : null;
+      form = 'object';
+    } else {
+      continue;
+    }
+    const r = resolved.get(id);
+    if (r) {
+      // Discovered custom extension overrides the bare-ID guess.
+      if (r.kind === 'builtin') {
+        // Core/bundled extension (e.g. TurboWarp's `tw`): not injected as a
+        // js dependency; preserved as a bare id on export.
+        entries.push({ id, spec: 'builtin', form: 'builtin', kind: 'builtin' });
+      } else if (r.kind === 'url') {
+        entries.push({ id, spec: r.url, form: 'string', kind: 'url' });
+      } else {
+        entries.push({ id, spec: 'source', form: 'object', kind: 'source' });
+      }
+    } else if (declaredUrl && form === 'string') {
+      entries.push({ id, spec: declaredUrl, form: 'string', kind: 'url' });
+    } else if (form === 'object') {
       entries.push({
-        id: ext.extensionId,
-        spec: typeof ext.js === 'string' ? ext.js : 'builtin',
+        id,
+        spec: declaredUrl || 'builtin',
         form: 'object',
+        kind: declaredUrl ? 'url' : 'builtin',
       });
+    } else {
+      entries.push({ id, spec: 'builtin', form: 'builtin', kind: 'builtin' });
+    }
+  }
+  // Surface any discovered custom extension not already listed in extensions[].
+  for (const [id, r] of resolved) {
+    if (entries.some((e) => e.id === id)) continue;
+    if (r.kind === 'builtin') continue; // core extension, not a project dependency
+    if (r.kind === 'url') {
+      entries.push({ id, spec: r.url, form: 'string', kind: 'url' });
+    } else {
+      entries.push({ id, spec: 'source', form: 'object', kind: 'source' });
     }
   }
   return entries;
@@ -187,7 +231,10 @@ export async function lockEntry(entry, cacheDir, { timeoutMs = 10000 } = {}) {
   const isUrl = /^https?:\/\//i.test(spec);
   let bytes;
   try {
-    if (isUrl) {
+    if (entry.kind === 'source') {
+      // Embedded extension: the source was cached at import time.
+      bytes = await fs.readFile(path.join(cacheDir || '', `${entry.id}.js`));
+    } else if (isUrl) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
