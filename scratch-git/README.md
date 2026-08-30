@@ -123,9 +123,31 @@ The tree is a mix of human-readable text and binary assets, handled separately:
 - **Binary conflicts** (assets `*.svg/*.png/*.wav/...`): git cannot text-merge; `git palette
   conflicts` tags these `binary`. Use `git palette resolve <file> --ours|--theirs` to take one
   side wholesale and `git add` it.
-- **Reverse sync during conflicts**: `post-checkout` / `post-merge` detect unresolved conflicts
-  (`git diff --diff-filter=U`) and **skip** regenerating the `.sb3`, so a half-conflicted tree
-  never produces a broken `.sb3`.
+ - **Reverse sync during conflicts**: `post-checkout` / `post-merge` detect unresolved conflicts
+   (`git diff --diff-filter=U`) and **skip** regenerating the `.sb3`, so a half-conflicted tree
+   never produces a broken `.sb3`.
+
+## Round-trip Fidelity
+
+What you store in git (the `.sb` scratchblocks text + `project.json`) is **functionally
+equivalent** to the original `.sb3`, and re-packing produces a `.sb3` that Scratch / TurboWarp
+opens without errors. The exact guarantee depends on what your project contains:
+
+| Project shape | Round-trip result |
+| --- | --- |
+| Vanilla blocks (no custom blocks, no extensions) | **byte-identical** blocks JSON |
+| Projects with custom blocks (define + call), variables, lists, broadcasts | blocks JSON **byte-identical**, including original block ids |
+| Projects that load extensions whose source is reachable (`.palette/cache/*.js` or a `data:` URL in the project) | extension blocks registered, blocks JSON byte-identical |
+| Projects with TurboWarp / PenguinMod bundled extensions | registered, blocks JSON byte-identical |
+| Projects with custom extensions whose source is **not** in the project / cache | those extension blocks render as `[unknown opcode: …]` placeholders (lossy for those blocks; safety guard prevents the rest of the project from cascading into corruption) |
+| Projects that use advanced Turbowarp features (nested `procedures_call` in expressions, complex custom-block proccodes) | **functionally** equivalent; block **ids** and a few cosmetic form details (input-key strings, genId order) may differ from the source, but the block graph is structurally complete and the `.sb3` opens and runs identically |
+
+If the round-trip detects that too many blocks were lost (e.g. an extension whose source you
+didn't bundle), the repack **falls back** to a structure-only rebuild with fresh block ids and
+prints a warning — it never produces a broken `.sb3`. See `PLAN.md` in the scratch-toolchain
+repo for the full byte-identical report and the small set of edge cases where it can't be
+guaranteed (mostly: dynamic argId keys in custom-block call inputs and projects that bundle
+custom extensions without their source).
 
 ## How It Works (hooks)
 

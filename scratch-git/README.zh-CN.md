@@ -117,8 +117,26 @@ git 对象库 = 展开树（唯一真相）
   `importedAt` 时间戳，被 `status` / 比对自动忽略。
 - **二进制冲突**（素材 `*.svg/*.png/*.wav/...`）：git 无法文本合并，`git palette conflicts` 标注为
   `binary`。用 `git palette resolve <file> --ours|--theirs` 整文件取一侧并 `git add`。
-- **冲突期间的反向同步**：`post-checkout` / `post-merge` 检测到未解决冲突（`git diff --diff-filter=U`）
-  时会**跳过** `.sb3` 重建，避免用半冲突的树生成坏 `.sb3`。
+ - **冲突期间的反向同步**：`post-checkout` / `post-merge` 检测到未解决冲突（`git diff --diff-filter=U`）
+   时会**跳过** `.sb3` 重建，避免用半冲突的树生成坏 `.sb3`。
+
+## 往返保真度
+
+git 中存储的内容（`.sb` scratchblocks 文本 + `project.json`）与原 `.sb3` **功能等价**，重新打包
+出来的 `.sb3` 能被 Scratch / TurboWarp 正常打开运行。能否 byte-identical 取决于项目内容：
+
+| 项目形态 | 往返结果 |
+| --- | --- |
+| 纯 vanilla 块（无自定义块、无扩展） | **byte-identical** blocks JSON |
+| 含自定义块（define + call）、变量、列表、广播 | blocks JSON **byte-identical**，保留原 block id |
+| 项目加载的扩展源码可达（`.palette/cache/*.js` 或项目内有 `data:` URL） | 扩展块正常注册，blocks JSON byte-identical |
+| TurboWarp / PenguinMod 内置扩展 | 自动注册，blocks JSON byte-identical |
+| 自定义扩展源码**不可达**（未打包进 cache、项目内也无） | 这些扩展块渲染为 `[unknown opcode: …]` 占位符（仅这些块有损；安全护栏阻止损失蔓延到其他块） |
+| 使用 Turbowarp 高级特性（表达式中嵌套 `procedures_call`、复杂自定义块 proccode） | **功能等价**；block **id** 和少量展示形式细节（input key 字符串、genId 顺序）可能与源码不同，但块图结构完整，`.sb3` 打开运行完全一致 |
+
+如果往返检测到丢块过多（例如某个扩展你忘了把源码打包进来），repack 会**回退**为仅结构重建（生成新 id）并打印
+警告——绝不会生成坏 `.sb3`。完整的 byte-identical 报告与少量无法保证的边界情况（主要是自定义块
+调用 inputs 的动态 argId key 和没带源码的扩展）见 scratch-toolchain 仓库的 `PLAN.md`。
 
 ## 工作原理（hook）
 
