@@ -31,6 +31,7 @@ export const TYPE_FILE = 'type.json';
 export const META_FILE = 'meta.json';
 export const PROJECT_FILE = 'project.json';
 export const ASSET_MAP_FILE = 'assets.json';
+export const POSITIONS_FILE = 'block-positions.json';
 export const DEPS_FILE = '.scratchdeps';
 
 /**
@@ -54,12 +55,14 @@ export const DEPS_FILE = '.scratchdeps';
  * @param {string} [options.language='en'] - Block language for .sb files.
  * @param {object} [options.sbSnippets] - Pre-rendered per-target scratchblocks
  *   snippets from `sbTextForProject(json, { language })`; keyed by target name.
+ * @param {object} [options.positions] - Per-target top-level block (x,y) for
+ *   lossless repack; keyed by target name → `[[x, y], ...]` in text order.
  * @returns {TreeFile[]}
  */
 export function buildTree(
   json,
   assets,
-  { name = 'untitled', source = '', depsText = '', language = 'en', sbSnippets } = {},
+  { name = 'untitled', source = '', depsText = '', language = 'en', sbSnippets, positions } = {},
 ) {
   const files = [];
   const assetMap = {};
@@ -136,6 +139,12 @@ export function buildTree(
     rel: fileInPalette(ASSET_MAP_FILE),
     content: prettyJson(assetMap),
   });
+  if (positions) {
+    files.push({
+      rel: fileInPalette(POSITIONS_FILE),
+      content: prettyJson(positions),
+    });
+  }
   if (depsText) files.push({ rel: DEPS_FILE, content: depsText });
 
   return files;
@@ -307,7 +316,7 @@ async function collectUnreferenced(treeRoot, referenced) {
  * @param {object} json
  * @returns {Map<object, string>}
  */
-function assignTargetDirs(json) {
+export function assignTargetDirs(json) {
   const dirs = new Map();
   const used = new Set();
   for (const target of (json && json.targets) || []) {

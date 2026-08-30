@@ -26,7 +26,7 @@ import {
   readDepsFile,
 } from './deps.js';
 import { parseExtension, serializeSnapshot } from 'scratch-sandbox';
-import { resolveExtensions, registerCachedExtensions } from './extresolve.js';
+import { resolveExtensions, registerCachedExtensions } from 'extension-git';
 import {
   repoRoot,
   setConfig,
@@ -130,12 +130,13 @@ program
     const paletteDir = path.join(root, '.palette');
     const { resolvedById, warnings } = await resolveExtensions(json, { paletteDir });
     for (const w of warnings) process.stderr.write(`git-palette: warning: ${w}\n`);
-    const sbSnippets = await sbTextForProject(json, { language: 'en' });
+    const { targets: sbSnippets, positions } = await sbTextForProject(json, { language: 'en' });
     const files = buildTree(json, assets, {
       name: stripSb3Ext(path.basename(file)),
       source: file,
-      depsText: renderDeps(extractDeps(json, resolvedById)),
+      depsText,
       sbSnippets,
+      positions,
     });
     await writeTree(root, files);
     const assetsDone = files.filter((f) => f.content instanceof Uint8Array).length;
@@ -270,12 +271,13 @@ async function ignoredSb3s(root) {
 async function statusOne(root, sb3) {
   const { json, assets } = await readSb3(sb3);
   await registerCachedExtensions(path.join(root, '.palette'));
-  const snippets = await sbTextForProject(json, { language: 'en' });
+  const { targets: snippets, positions } = await sbTextForProject(json, { language: 'en' });
   const files = buildTree(json, assets, {
     name: stripSb3Ext(path.basename(sb3)),
     source: sb3,
     depsText: renderDeps(extractDeps(json)),
     sbSnippets: snippets,
+    positions,
   });
   const hasTree = await isFile(path.join(root, '.palette', 'project.json'));
   if (!hasTree) {

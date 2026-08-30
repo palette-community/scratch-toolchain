@@ -1,0 +1,18 @@
+{
+  "name": "extension-git",
+  "description": "Scratch extension discovery, resolution and registration for the git-palette workflow. Turns a project's recorded extension sources (URLs or inline `data:` URLs) into registered block definitions so vanilla + extension blocks round-trip losslessly.",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MPL-2.0",
+  "main": "src/index.js",
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "parse-sb3-blocks": "github:palette-community/parse-sb3-blocks",
+    "scratch-sandbox": "github:palette-community/scratch-sandbox"
+  }
+}

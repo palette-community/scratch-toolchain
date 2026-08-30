@@ -27,15 +27,15 @@ export async function sbTextForProject(json, { language = 'en' } = {}) {
   try {
     // projectToSnippets mutates the input (it annotates blocks with `id`),
     // so render from a clone to keep the authoritative json untouched.
-    const { targets } = await projectToSnippets(structuredClone(json), {
+    const { targets, positions } = await projectToSnippets(structuredClone(json), {
       locale: language,
     });
-    return targets;
+    return { targets, positions };
   } catch (err) {
     // A parser/extension hiccup must never sink the whole unpack; callers
     // fall back to empty .sb files for the affected targets.
     process.stderr.write(`git-palette: warning: .sb rendering failed: ${err.message}\n`);
-    return {};
+    return { targets: {}, positions: {} };
   }
 }
 

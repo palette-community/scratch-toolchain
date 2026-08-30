@@ -14,7 +14,8 @@ import { loadSb3, writeSb3 } from './sb3.js';
 import { buildTree, readTree, PALETTE_DIR, ROLES_DIR } from './tree.js';
 import { sbTextForProject } from './text.js';
 import { extractDeps, renderDeps, parseDeps, applyDepsToJson, readDepsFile } from './deps.js';
-import { resolveExtensions } from './extresolve.js';
+import { resolveExtensions } from 'extension-git';
+import { repackProject } from './repack.js';
 import {
   repoRoot,
   stagedFiles,
@@ -57,12 +58,13 @@ export async function runPreCommit({ cwd } = {}) {
     const { resolvedById, warnings } = await resolveExtensions(json, { paletteDir });
     for (const w of warnings) process.stderr.write(`git-palette: warning: ${w}\n`);
     const depsText = renderDeps(extractDeps(json, resolvedById));
-    const sbSnippets = await sbTextForProject(json, { language: 'en' });
+    const { targets: sbSnippets, positions } = await sbTextForProject(json, { language: 'en' });
     const files = buildTree(json, assets, {
       name: path.basename(rel).replace(/\.sb3$/i, ''),
       source: rel,
       depsText,
       sbSnippets,
+      positions,
     });
     await writeTree(root, files);
     const assetFiles = files.filter(
@@ -164,7 +166,7 @@ async function readDirRecursive(dir, base = dir) {
  * @returns {Promise<{ outPath: string, warnings: string[] }>}
  */
 export async function runExport(root, { out } = {}) {
-  const { json, assets, warnings } = await readTree(root);
+  const { json, assets, warnings } = await repackProject(root);
   const { entries } = parseDeps(await readDepsFile(root));
   await applyDepsToJson(json, entries, {
     cacheDir: path.join(root, '.palette', CACHE_DIR),

@@ -1,6 +1,6 @@
 {
-  "name": "git-palette",
-  "description": "Scratch collaboration workflow: store the expanded tree of a .sb3 (roles/costumes/sounds + .palette) in git; a pre-commit hook auto-unpacks the .sb3 on commit. Run as `git palette`.",
+  "name": "scratch-git",
+  "description": "Scratch collaboration workflow with git: store the expanded tree of a .sb3 (roles/costumes/sounds + .palette) in git; a pre-commit hook auto-unpacks the .sb3 on commit. Vanilla blocks are handled here; extension parsing/registration lives in the `extension-git` dependency.",
   "version": "0.1.0",
   "type": "module",
   "license": "MPL-2.0",
@@ -14,13 +14,10 @@
   "engines": {
     "node": ">=18"
   },
-  "scripts": {
-    "start": "node src/index.js",
-    "test": "node --test --test-timeout=120000 \"test/**/*.test.js\""
-  },
   "dependencies": {
     "@turbowarp/jszip": "^3.12.0",
     "commander": "^14.0.0",
+    "extension-git": "file:../extension-git",
     "parse-sb3-blocks": "github:palette-community/parse-sb3-blocks",
     "scratch-sandbox": "github:palette-community/scratch-sandbox"
   }
