@@ -4,7 +4,7 @@
 # Reference material (external docs整理); not versioned.
 /docs/reference/
 
-# git-palette
+# scratch-git / extension-git (the two packages in this monorepo)
 node_modules/
 *.sb3
 

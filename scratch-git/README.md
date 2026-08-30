@@ -1,13 +1,16 @@
-# git-palette
+# scratch-git
 
-Store a Scratch / TurboWarp project in git as an **expanded, diff-friendly tree** instead of an
-opaque `.sb3` zip. The `.sb3` is unpacked into `.palette/` + `roles/` by a `pre-commit` hook on
-commit, and repacked back into a `.sb3` by `post-checkout` / `post-merge` hooks after the tree
-changes. Tool output is stable, English-only text (safe to parse from scripts).
+The vanilla-Scratch half of the [scratch-toolchain](https://github.com/palette-community/scratch-toolchain)
+collaboration workflow. Stores a Scratch / TurboWarp project in git as an **expanded,
+diff-friendly tree** instead of an opaque `.sb3` zip. The `.sb3` is unpacked into
+`.palette/` + `roles/` by a `pre-commit` hook on commit, and repacked back into a `.sb3`
+by `post-checkout` / `post-merge` hooks after the tree changes. Tool output is stable,
+English-only text (safe to parse from scripts).
 
-Part of the [scratch-toolchain](https://github.com/palette-community/scratch-toolchain) family;
-used together with [scratch-sandbox](https://github.com/palette-community/scratch-sandbox) for
-extension block rendering.
+The CLI is exposed as the `git palette` subcommand (the historical name — kept for
+backward compatibility with existing hooks and muscle memory). Extension discovery and
+registration is the sibling [`extension-git`](../extension-git) package; `scratch-git` depends
+on it for every conversion.
 
 English | **[中文](README.zh-CN.md)**
 
@@ -18,6 +21,7 @@ English | **[中文](README.zh-CN.md)**
 - [Commands](#commands)
 - [Workflow](#workflow)
 - [Merge Conflict Handling](#merge-conflict-handling)
+- [Round-trip Fidelity](#round-trip-fidelity)
 - [How It Works (hooks)](#how-it-works-hooks)
 - [Extension Dependencies (`.scratchdeps`)](#extension-dependencies-scratchdeps)
 - [Development](#development)
@@ -28,10 +32,12 @@ English | **[中文](README.zh-CN.md)**
 ## Installation & Usage
 
 ```sh
-npm install github:palette-community/git-palette
+npm install github:palette-community/scratch-toolchain#packages/scratch-git
 ```
 
-`git-palette` is discovered by git as a subcommand (`git palette <cmd>`). In a project repo:
+(or install the whole monorepo at the repo root and depend on the `scratch-git` workspace)
+
+`scratch-git` is discovered by git as the `git palette` subcommand. In a project repo:
 
 ```sh
 git palette init MyProject     # scaffold .palette/, README.md, .scratchdeps, .gitignore
@@ -75,7 +81,7 @@ stable diffs.
 
 | Command | Purpose |
 |---|---|
-| `git palette install` | Set `core.hooksPath` → tool hooks; ensure `.gitignore` (`/scratch4js/`, `*.sb3`, `node_modules/`) |
+| `git palette install` | Set `core.hooksPath` → tool hooks; ensure `.gitignore` (`*.sb3`, `node_modules/`) |
 | `git palette init [name]` | Scaffold `.palette/`, `README.md`, `.scratchdeps`, and `.gitignore` |
 | `git palette import <file.sb3>` | Manually unpack a `.sb3` into the tree (no commit) |
 | `git palette export [-o out.sb3]` | Pack the tree back into a `.sb3` (project.json authoritative + assets + extension injection) |
@@ -123,9 +129,9 @@ The tree is a mix of human-readable text and binary assets, handled separately:
 - **Binary conflicts** (assets `*.svg/*.png/*.wav/...`): git cannot text-merge; `git palette
   conflicts` tags these `binary`. Use `git palette resolve <file> --ours|--theirs` to take one
   side wholesale and `git add` it.
- - **Reverse sync during conflicts**: `post-checkout` / `post-merge` detect unresolved conflicts
-   (`git diff --diff-filter=U`) and **skip** regenerating the `.sb3`, so a half-conflicted tree
-   never produces a broken `.sb3`.
+- **Reverse sync during conflicts**: `post-checkout` / `post-merge` detect unresolved conflicts
+  (`git diff --diff-filter=U`) and **skip** regenerating the `.sb3`, so a half-conflicted tree
+  never produces a broken `.sb3`.
 
 ## Round-trip Fidelity
 
@@ -144,10 +150,7 @@ opens without errors. The exact guarantee depends on what your project contains:
 
 If the round-trip detects that too many blocks were lost (e.g. an extension whose source you
 didn't bundle), the repack **falls back** to a structure-only rebuild with fresh block ids and
-prints a warning — it never produces a broken `.sb3`. See `PLAN.md` in the scratch-toolchain
-repo for the full byte-identical report and the small set of edge cases where it can't be
-guaranteed (mostly: dynamic argId keys in custom-block call inputs and projects that bundle
-custom extensions without their source).
+prints a warning — it never produces a broken `.sb3`.
 
 ## How It Works (hooks)
 
@@ -169,6 +172,11 @@ myext: https://ext.turbowarp.org/foo.js
 - `export` writes them back: builtin → string; custom → `{extensionId, js, type:'extension'}`.
 - `deps lock` downloads custom extension JS into `.palette/cache/<id>.js` and records its sha256.
 
+Actual extension discovery, URL/data: URL decoding, scratch-sandbox evaluation, and built-in
+TurboWarp submodule registration live in the [`extension-git`](../extension-git) sibling
+package; this one only invokes the public API (`resolveExtensions`,
+`registerCachedExtensions`, `registerTurbowarpBuiltins`).
+
 ## Development
 
 ```sh
@@ -176,6 +184,15 @@ npm test            # node --test test/*.test.js
 ```
 
 Round-trip, conflict, and git-flow integration tests run against temporary git repos.
+
+Development against the live `parse-sb3-blocks` source (sibling repo):
+
+```sh
+rm -rf node_modules/parse-sb3-blocks
+ln -s ../../parse-sb3-blocks node_modules/parse-sb3-blocks
+```
+
+`npm install` replaces the symlink with the published tarball; recreate it after every install.
 
 ## License
 
